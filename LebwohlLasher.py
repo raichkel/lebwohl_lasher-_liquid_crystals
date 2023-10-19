@@ -28,7 +28,7 @@ import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-
+from mpi4py import MPI
 #=======================================================================
 def initdat(nmax):
     """
@@ -207,7 +207,7 @@ def get_order(arr,nmax):
     eigenvalues,eigenvectors = np.linalg.eig(Qab)
     return eigenvalues.max()
 #=======================================================================
-def MC_step(arr,Ts,nmax):
+def MC_step(arr,Ts,nmax, rank, chunks):
     """
     Arguments:
 	  arr (float(nmax,nmax)) = array that contains lattice data;
@@ -233,7 +233,14 @@ def MC_step(arr,Ts,nmax):
     xran = np.random.randint(0,high=nmax, size=(nmax,nmax))
     yran = np.random.randint(0,high=nmax, size=(nmax,nmax))
     aran = np.random.normal(scale=scale, size=(nmax,nmax))
-    for i in range(nmax):
+
+    # split lattice over n processes 
+    # start with simple case where we assume that nmax/nprocs is int 
+    # each rank has been broadcast the size of chunks from rank 0
+
+    imax_for_rank = 2*(rank) + (chunks-1)
+    for i in range(2*rank, imax_for_rank):
+        # lattice is split into strips, so all j go with each i 
         for j in range(nmax):
             ix = xran[i,j]
             iy = yran[i,j]
@@ -267,6 +274,9 @@ def main(program, nsteps, nmax, temp, pflag):
     Returns:
       NULL
     """
+    # get rank and size
+    rank = MPI.COMM_WORLD.Get_rank()
+    size = MPI.COMM_WORLD.Get_size() 
     # Create and initialise lattice
     lattice = initdat(nmax)
     # Plot initial frame of lattice
@@ -281,9 +291,17 @@ def main(program, nsteps, nmax, temp, pflag):
     order[0] = get_order(lattice,nmax)
 
     # Begin doing and timing some MC steps.
+    # find number of chunks that lattice can be split into
+    # control rank will tell the others how many pieces to split the lattice into
+    if(rank==0):
+      # size of chunks to split grid into
+      ###### REQUIRES nmax/size = int
+      chunks = nmax/size
+      comm.bcast(chunks, root=0)
+
     initial = time.time()
     for it in range(1,nsteps+1):
-        ratio[it] = MC_step(lattice,temp,nmax)
+        ratio[it] = MC_step(lattice,temp,nmax, rank, chunks)
         energy[it] = all_energy(lattice,nmax)
         order[it] = get_order(lattice,nmax)
     final = time.time()
