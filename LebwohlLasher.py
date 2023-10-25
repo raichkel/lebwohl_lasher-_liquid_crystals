@@ -44,7 +44,7 @@ def initdat(nmax):
     arr = np.random.random_sample((nmax,nmax))*2.0*np.pi
     return arr
 #=======================================================================
-def plotdat(arr,pflag,nmax):
+def plotdat(arr,pflag,nmax, final_plot= False):
     """
     Arguments:
 	  arr (float(nmax,nmax)) = array that contains lattice data;
@@ -89,7 +89,11 @@ def plotdat(arr,pflag,nmax):
     fig, ax = plt.subplots()
     q = ax.quiver(x, y, u, v, cols,norm=norm, **quiveropts)
     ax.set_aspect('equal')
-    plt.savefig("initial.png")
+    if(final_plot == True):
+      plt.savefig("final.png")
+    else:
+      plt.savefig("initial.png")
+        
     #plt.show()
 #=======================================================================
 def savedat(arr,nsteps,Ts,runtime,ratio,energy,order,nmax):
@@ -208,7 +212,7 @@ def get_order(arr,nmax):
     eigenvalues,eigenvectors = np.linalg.eig(Qab)
     return eigenvalues.max()
 #=======================================================================
-def MC_step(arr,Ts,nmax, rank, chunks):
+def MC_step(arr,Ts,nmax, rank, chunks, imax_for_rank):
     """
     Arguments:
 	  arr (float(nmax,nmax)) = array that contains lattice data;
@@ -251,7 +255,7 @@ def MC_step(arr,Ts,nmax, rank, chunks):
     # start with simple case where we assume that nmax/nprocs is int 
     # each rank has been broadcast the size of chunks from rank 0
 
-    imax_for_rank = 2*(rank) + (chunks-1)
+    
     for i in range(2*rank, imax_for_rank):
         # lattice is split into strips, so all j go with each i 
         for j in range(nmax):
@@ -320,9 +324,10 @@ def main(program, nsteps, nmax, temp, pflag):
     chunks = MPI.COMM_WORLD.bcast(chunks, root=0)
     print(f"chunks = {chunks}")
 
+    imax_for_rank = 2*(rank) + (chunks-1)
     initial = time.time()
     for it in range(1,nsteps+1):
-        accept_rank = MC_step(lattice,temp,nmax, rank, chunks)
+        accept_rank = MC_step(lattice,temp,nmax, rank, chunks, imax_for_rank)
         # accept += through serial loop, so at the end of the MPI process need to add all indiviudal processes' 
         # accepts together
         # all ranks send their accept value to rank 0
@@ -344,7 +349,20 @@ def main(program, nsteps, nmax, temp, pflag):
     final = time.time()
     runtime = final-initial
     
-    # need to combine all of the lattices from each rank into one output lattice
+    #combine all of the lattices from each rank into one output lattice
+    # each rank must send its lattice to rank 0 
+    # each chunk needs to be copied into its relevant section of the lattice
+
+    this_rank_chunk = lattice[2*rank:imax_for_rank, :]
+    
+    if(rank!=0): # send this rank's section to rank 0
+      MPI.COMM_WORLD.Send([this_rank_chunk, MPI.FLOAT], 0, tag=2)
+
+    if(rank==0): # recieve the other ranks' lattice values anc copy over to the main lattice
+      for r in range(1,size):
+        MPI.COMM_WORLD.Recv([this_rank_chunk, MPI.FLOAT], r, tag =2)
+        im = 2*(r) + (chunks-1)
+        lattice[2*r:im, :] = this_rank_chunk
     
     # Final outputs
     print("{}: Size: {:d}, Steps: {:d}, T*: {:5.3f}: Order: {:5.3f}, Time: {:8.6f} s".format(program, nmax,nsteps,temp,order[nsteps-1],runtime))
