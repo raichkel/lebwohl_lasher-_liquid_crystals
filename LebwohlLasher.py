@@ -89,7 +89,8 @@ def plotdat(arr,pflag,nmax):
     fig, ax = plt.subplots()
     q = ax.quiver(x, y, u, v, cols,norm=norm, **quiveropts)
     ax.set_aspect('equal')
-    plt.show()
+    plt.savefig("initial.png")
+    #plt.show()
 #=======================================================================
 def savedat(arr,nsteps,Ts,runtime,ratio,energy,order,nmax):
     """
@@ -230,9 +231,21 @@ def MC_step(arr,Ts,nmax, rank, chunks):
     # with temperature.
     scale=0.1+Ts
     accept = 0
-    xran = np.random.randint(0,high=nmax, size=(nmax,nmax))
-    yran = np.random.randint(0,high=nmax, size=(nmax,nmax))
-    aran = np.random.normal(scale=scale, size=(nmax,nmax))
+
+    # rank 0 calculates the random numbers, broadcasts to all other ranks
+    if(rank==0):
+      xran = np.random.randint(0,high=nmax, size=(nmax,nmax))
+      yran = np.random.randint(0,high=nmax, size=(nmax,nmax))
+      aran = np.random.normal(scale=scale, size=(nmax,nmax))
+
+    else:
+        xran = np.zeros(size=(nmax,nmax))
+        yran = np.zeros(size=(nmax,nmax))
+        aran = np.zeros(size=(nmax,nmax))
+    
+    xran = MPI.COMM_WORLD.Bcast(xran, root=0)
+    yran = MPI.COMM_WORLD.Bcast(yran, root=0)
+    aran = MPI.COMM_WORLD.Bcast(aran, root=0)
 
     # split lattice over n processes 
     # start with simple case where we assume that nmax/nprocs is int 
@@ -259,7 +272,8 @@ def MC_step(arr,Ts,nmax, rank, chunks):
                     accept += 1
                 else:
                     arr[ix,iy] -= ang
-    return accept/(nmax*nmax)
+
+    return accept
 #=======================================================================
 def main(program, nsteps, nmax, temp, pflag):
     """
@@ -276,11 +290,14 @@ def main(program, nsteps, nmax, temp, pflag):
     """
     # get rank and size
     rank = MPI.COMM_WORLD.Get_rank()
-    size = MPI.COMM_WORLD.Get_size() 
+    size = MPI.COMM_WORLD.Get_size()
     # Create and initialise lattice
+    # every rank gets the full lattice for now to allow for neighbours 
     lattice = initdat(nmax)
-    # Plot initial frame of lattice
-    plotdat(lattice,pflag,nmax)
+
+    if(rank ==0):
+      # Plot initial frame of lattice
+      plotdat(lattice,pflag,nmax)
     # Create arrays to store energy, acceptance ratio and order parameter
     energy = np.zeros(nsteps+1,dtype=np.dtype)
     ratio = np.zeros(nsteps+1,dtype=np.dtype)
@@ -296,16 +313,38 @@ def main(program, nsteps, nmax, temp, pflag):
     if(rank==0):
       # size of chunks to split grid into
       ###### REQUIRES nmax/size = int
-      chunks = nmax/size
-      comm.bcast(chunks, root=0)
+      chunks = int(nmax/size)
+    else:
+      chunks = 0
+    
+    chunks = MPI.COMM_WORLD.bcast(chunks, root=0)
+    print(f"chunks = {chunks}")
 
     initial = time.time()
     for it in range(1,nsteps+1):
-        ratio[it] = MC_step(lattice,temp,nmax, rank, chunks)
+        accept_rank = MC_step(lattice,temp,nmax, rank, chunks)
+        # accept += through serial loop, so at the end of the MPI process need to add all indiviudal processes' 
+        # accepts together
+        # all ranks send their accept value to rank 0
+        if rank!=0:
+          MPI.COMM_WORLD.send(accept_rank, 0, tag = 1)
+
+        if rank==0:
+          # rank 0 recieves all values and sums
+          # rank 0 returns 
+          accept = accept_rank
+          for r in range(1,size):
+              MPI.COMM_WORLD.recv(accept_rank, r, tag = 1)
+              accept += accept_rank
+
+          ratio[it] = accept/(nmax*nmax)
+        
         energy[it] = all_energy(lattice,nmax)
         order[it] = get_order(lattice,nmax)
     final = time.time()
     runtime = final-initial
+    
+    # need to combine all of the lattices from each rank into one output lattice
     
     # Final outputs
     print("{}: Size: {:d}, Steps: {:d}, T*: {:5.3f}: Order: {:5.3f}, Time: {:8.6f} s".format(program, nmax,nsteps,temp,order[nsteps-1],runtime))

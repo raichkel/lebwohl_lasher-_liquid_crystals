@@ -16,7 +16,7 @@
 
 # Just in case this is not loaded already...
 module load languages/intel/2020-u4
-module add languages/anaconda3/2020-3.8.5
+module add languages/anaconda3/2022.11-3.9.13
 
 # Change to working directory, where the job was submitted from.
 cd "${SLURM_SUBMIT_DIR}"
@@ -31,7 +31,7 @@ echo "${SLURM_JOB_NODELIST}"
 printf "\n\n"
 
 # Submit
-mpiexec -n 4 python -m mpi4py.bench helloworld
+mpiexec -n 4 python LebwohlLasher.py 3 20 1.0 1
 
 # Output the end time
 printf "\n\n"
