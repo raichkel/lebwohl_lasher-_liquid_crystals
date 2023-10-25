@@ -243,9 +243,9 @@ def MC_step(arr,Ts,nmax, rank, chunks, imax_for_rank):
       aran = np.random.normal(scale=scale, size=(nmax,nmax))
 
     else:
-        xran = np.zeros((nmax,nmax))
-        yran = np.zeros((nmax,nmax))
-        aran = np.zeros((nmax,nmax))
+      xran = np.zeros((nmax,nmax))
+      yran = np.zeros((nmax,nmax))
+      aran = np.zeros((nmax,nmax))
     
     xran = MPI.COMM_WORLD.Bcast([xran, MPI.FLOAT], root=0)
     yran = MPI.COMM_WORLD.Bcast([yran, MPI.FLOAT], root=0)
