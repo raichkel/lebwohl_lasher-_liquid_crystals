@@ -243,14 +243,16 @@ def MC_step(arr,Ts,nmax, rank, chunks, imax_for_rank):
       aran = np.random.normal(scale=scale, size=(nmax,nmax))
 
     else:
-        xran = np.zeros(size=(nmax,nmax))
-        yran = np.zeros(size=(nmax,nmax))
-        aran = np.zeros(size=(nmax,nmax))
+        xran = np.zeros((nmax,nmax))
+        yran = np.zeros((nmax,nmax))
+        aran = np.zeros((nmax,nmax))
     
-    xran = MPI.COMM_WORLD.Bcast(xran, root=0)
-    yran = MPI.COMM_WORLD.Bcast(yran, root=0)
-    aran = MPI.COMM_WORLD.Bcast(aran, root=0)
+    xran = MPI.COMM_WORLD.Bcast([xran, MPI.FLOAT], root=0)
+    yran = MPI.COMM_WORLD.Bcast([yran, MPI.FLOAT], root=0)
+    aran = MPI.COMM_WORLD.Bcast([aran, MPI.FLOAT], root=0)
 
+    print(np.shape(xran))
+    print(type(xran))
     # split lattice over n processes 
     # start with simple case where we assume that nmax/nprocs is int 
     # each rank has been broadcast the size of chunks from rank 0
@@ -322,7 +324,7 @@ def main(program, nsteps, nmax, temp, pflag):
       chunks = 0
     
     chunks = MPI.COMM_WORLD.bcast(chunks, root=0)
-    print(f"chunks = {chunks}")
+    
 
     imax_for_rank = 2*(rank) + (chunks-1)
     initial = time.time()
@@ -368,7 +370,7 @@ def main(program, nsteps, nmax, temp, pflag):
     print("{}: Size: {:d}, Steps: {:d}, T*: {:5.3f}: Order: {:5.3f}, Time: {:8.6f} s".format(program, nmax,nsteps,temp,order[nsteps-1],runtime))
     # Plot final frame of lattice and generate output file
     savedat(lattice,nsteps,temp,runtime,ratio,energy,order,nmax)
-    plotdat(lattice,pflag,nmax)
+    plotdat(lattice,pflag,nmax, final_plot=True)
 #=======================================================================
 # Main part of program, getting command line arguments and calling
 # main simulation function.
