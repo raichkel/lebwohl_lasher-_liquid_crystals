@@ -149,11 +149,11 @@ def one_energy(arr,ix,iy,nmax):
 	  en (float) = reduced energy of cell.
     """
     en = 0.0
-    ixp = int((ix+1)%nmax) # These are the coordinates
-    ixm = int((ix-1)%nmax) # of the neighbours
-    iyp = int((iy+1)%nmax) # with wraparound
-    iym = int((iy-1)%nmax) #
-    #print(f"ix={ix},iy={iy},ixp={ixp},ixm={ixm},iyp={iyp},iym={iym}")
+    ixp = (ix+1)%nmax # These are the coordinates
+    ixm = (ix-1)%nmax # of the neighbours
+    iyp = (iy+1)%nmax # with wraparound
+    iym = (iy-1)%nmax #
+    print(f"ix={ix},iy={iy},ixp={ixp},ixm={ixm},iyp={iyp},iym={iym}")
     #print(f"type(ix)={type(ix)},type(iy)={type(iy)},type(ixp)={type(ixp)},type(ixm)={type(ixm)},type(iyp)={type(iyp)},type(iym)={type(iym)}")
     
 # Add together the 4 neighbour contributions
@@ -250,9 +250,22 @@ def MC_step(arr,Ts,nmax, rank, chunks, imax_for_rank):
       yran = np.zeros((nmax,nmax))
       aran = np.zeros((nmax,nmax))
     
-    MPI.COMM_WORLD.Bcast([xran, MPI.INT], root=0)
-    MPI.COMM_WORLD.Bcast([yran, MPI.INT], root=0)
-    MPI.COMM_WORLD.Bcast([aran, MPI.FLOAT], root=0)
+
+    xran = MPI.COMM_WORLD.bcast(xran, root=0)
+    yran = MPI.COMM_WORLD.bcast(yran, root=0)
+    aran = MPI.COMM_WORLD.bcast(aran, root=0)
+
+ 
+    # print(f"rank={rank}")
+    # print("xran:")
+    # print(xran)
+    # print(arr.data.c_contiguous) 
+    # print("yran:")
+    # print(yran)
+    # print(arr.data.c_contiguous) 
+    # print("aran:")
+    # print(aran)
+    # print(arr.data.c_contiguous) 
 
     
 
@@ -264,8 +277,9 @@ def MC_step(arr,Ts,nmax, rank, chunks, imax_for_rank):
     for i in range(2*rank, imax_for_rank):
         # lattice is split into strips, so all j go with each i 
         for j in range(nmax):
-            ix = int(xran[i,j])
-            iy = int(yran[i,j])
+            ix = xran[i,j]
+            iy = yran[i,j]
+            print(f"ix={ix},iy={iy}")
             ang = aran[i,j]
             en0 = one_energy(arr,ix,iy,nmax)
             
@@ -302,9 +316,10 @@ def main(program, nsteps, nmax, temp, pflag):
     rank = MPI.COMM_WORLD.Get_rank()
     size = MPI.COMM_WORLD.Get_size()
 
-    print(f"hello from rank {rank}")
+    #print(f"hello from rank {rank}")
 
     if(rank==0):
+      initial = time.time()
       # size of chunks to split grid into
       ###### REQUIRES nmax/size = int
       chunks = int(nmax/size)
@@ -313,9 +328,6 @@ def main(program, nsteps, nmax, temp, pflag):
       if(remainder!=0):
         raise Exception(f"Lattice size (nmax) must be divisible by number of ranks.\n Lattice size was {nmax}, num ranks was {size}.")
       
-         
-
-
     else:
       chunks = 0
     
@@ -343,7 +355,7 @@ def main(program, nsteps, nmax, temp, pflag):
     
 
     imax_for_rank = 2*(rank) + (chunks-1)
-    initial = time.time()
+    
     for it in range(1,nsteps+1):
         accept_rank = MC_step(lattice,temp, nmax, rank, chunks, imax_for_rank)
         # accept += through serial loop, so at the end of the MPI process need to add all indiviudal processes' 
@@ -357,15 +369,14 @@ def main(program, nsteps, nmax, temp, pflag):
           # rank 0 returns 
           accept = accept_rank
           for r in range(1,size):
-              MPI.COMM_WORLD.recv(accept_rank, r, tag = 1)
+              MPI.COMM_WORLD.recv(accept_rank, source=r, tag = 1)
               accept += accept_rank
 
           ratio[it] = accept/(nmax*nmax)
         
         energy[it] = all_energy(lattice,nmax)
         order[it] = get_order(lattice,nmax)
-    final = time.time()
-    runtime = final-initial
+    
     
     #combine all of the lattices from each rank into one output lattice
     # each rank must send its lattice to rank 0 
@@ -378,15 +389,18 @@ def main(program, nsteps, nmax, temp, pflag):
 
     if(rank==0): # recieve the other ranks' lattice values anc copy over to the main lattice
       for r in range(1,size):
-        MPI.COMM_WORLD.Recv([this_rank_chunk, MPI.FLOAT], r, tag =2)
+        MPI.COMM_WORLD.Recv([this_rank_chunk, MPI.FLOAT], source=r, tag =2)
         im = 2*(r) + (chunks-1)
         lattice[2*r:im, :] = this_rank_chunk
+      
+      final = time.time()
+      runtime = final-initial
     
-    # Final outputs
-    print("{}: Size: {:d}, Steps: {:d}, T*: {:5.3f}: Order: {:5.3f}, Time: {:8.6f} s".format(program, nmax,nsteps,temp,order[nsteps-1],runtime))
-    # Plot final frame of lattice and generate output file
-    savedat(lattice,nsteps,temp,runtime,ratio,energy,order,nmax)
-    plotdat(lattice,pflag,nmax, final_plot=True)
+      # Final outputs
+      print("{}: Size: {:d}, Steps: {:d}, T*: {:5.3f}: Order: {:5.3f}, Time: {:8.6f} s".format(program, nmax,nsteps,temp,order[nsteps-1],runtime))
+      # Plot final frame of lattice and generate output file
+      savedat(lattice,nsteps,temp,runtime,ratio,energy,order,nmax)
+      plotdat(lattice,pflag,nmax, final_plot=True)
 #=======================================================================
 # Main part of program, getting command line arguments and calling
 # main simulation function.
