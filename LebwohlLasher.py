@@ -149,14 +149,17 @@ def one_energy(arr,ix,iy,nmax):
 	  en (float) = reduced energy of cell.
     """
     en = 0.0
-    ixp = (ix+1)%nmax # These are the coordinates
-    ixm = (ix-1)%nmax # of the neighbours
-    iyp = (iy+1)%nmax # with wraparound
-    iym = (iy-1)%nmax #
-#
+    ixp = int((ix+1)%nmax) # These are the coordinates
+    ixm = int((ix-1)%nmax) # of the neighbours
+    iyp = int((iy+1)%nmax) # with wraparound
+    iym = int((iy-1)%nmax) #
+    #print(f"ix={ix},iy={iy},ixp={ixp},ixm={ixm},iyp={iyp},iym={iym}")
+    #print(f"type(ix)={type(ix)},type(iy)={type(iy)},type(ixp)={type(ixp)},type(ixm)={type(ixm)},type(iyp)={type(iyp)},type(iym)={type(iym)}")
+    
 # Add together the 4 neighbour contributions
 # to the energy
-#
+#   
+    # doesnt like the indexing of these - presumably one of the indices is a float by accident
     ang = arr[ix,iy]-arr[ixp,iy]
     en += 0.5*(1.0 - 3.0*np.cos(ang)**2)
     ang = arr[ix,iy]-arr[ixm,iy]
@@ -247,12 +250,12 @@ def MC_step(arr,Ts,nmax, rank, chunks, imax_for_rank):
       yran = np.zeros((nmax,nmax))
       aran = np.zeros((nmax,nmax))
     
-    xran = MPI.COMM_WORLD.Bcast([xran, MPI.FLOAT], root=0)
-    yran = MPI.COMM_WORLD.Bcast([yran, MPI.FLOAT], root=0)
-    aran = MPI.COMM_WORLD.Bcast([aran, MPI.FLOAT], root=0)
+    MPI.COMM_WORLD.Bcast([xran, MPI.INT], root=0)
+    MPI.COMM_WORLD.Bcast([yran, MPI.INT], root=0)
+    MPI.COMM_WORLD.Bcast([aran, MPI.FLOAT], root=0)
 
-    print(np.shape(xran))
-    print(type(xran))
+    
+
     # split lattice over n processes 
     # start with simple case where we assume that nmax/nprocs is int 
     # each rank has been broadcast the size of chunks from rank 0
@@ -261,10 +264,11 @@ def MC_step(arr,Ts,nmax, rank, chunks, imax_for_rank):
     for i in range(2*rank, imax_for_rank):
         # lattice is split into strips, so all j go with each i 
         for j in range(nmax):
-            ix = xran[i,j]
-            iy = yran[i,j]
+            ix = int(xran[i,j])
+            iy = int(yran[i,j])
             ang = aran[i,j]
             en0 = one_energy(arr,ix,iy,nmax)
+            
             arr[ix,iy] += ang
             en1 = one_energy(arr,ix,iy,nmax)
             if en1<=en0:
@@ -297,6 +301,24 @@ def main(program, nsteps, nmax, temp, pflag):
     # get rank and size
     rank = MPI.COMM_WORLD.Get_rank()
     size = MPI.COMM_WORLD.Get_size()
+
+    print(f"hello from rank {rank}")
+
+    if(rank==0):
+      # size of chunks to split grid into
+      ###### REQUIRES nmax/size = int
+      chunks = int(nmax/size)
+      remainder = nmax%size
+
+      if(remainder!=0):
+        raise Exception(f"Lattice size (nmax) must be divisible by number of ranks.\n Lattice size was {nmax}, num ranks was {size}.")
+      
+         
+
+
+    else:
+      chunks = 0
+    
     # Create and initialise lattice
     # every rank gets the full lattice for now to allow for neighbours 
     lattice = initdat(nmax)
@@ -316,12 +338,6 @@ def main(program, nsteps, nmax, temp, pflag):
     # Begin doing and timing some MC steps.
     # find number of chunks that lattice can be split into
     # control rank will tell the others how many pieces to split the lattice into
-    if(rank==0):
-      # size of chunks to split grid into
-      ###### REQUIRES nmax/size = int
-      chunks = int(nmax/size)
-    else:
-      chunks = 0
     
     chunks = MPI.COMM_WORLD.bcast(chunks, root=0)
     
@@ -329,7 +345,7 @@ def main(program, nsteps, nmax, temp, pflag):
     imax_for_rank = 2*(rank) + (chunks-1)
     initial = time.time()
     for it in range(1,nsteps+1):
-        accept_rank = MC_step(lattice,temp,nmax, rank, chunks, imax_for_rank)
+        accept_rank = MC_step(lattice,temp, nmax, rank, chunks, imax_for_rank)
         # accept += through serial loop, so at the end of the MPI process need to add all indiviudal processes' 
         # accepts together
         # all ranks send their accept value to rank 0
