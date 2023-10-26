@@ -90,9 +90,9 @@ def plotdat(arr,pflag,nmax, final_plot= False):
     q = ax.quiver(x, y, u, v, cols,norm=norm, **quiveropts)
     ax.set_aspect('equal')
     if(final_plot == True):
-      plt.savefig("final.png")
+      plt.savefig(f"final_{nmax}.png")
     else:
-      plt.savefig("initial.png")
+      plt.savefig(f"initial_{nmax}.png")
         
     #plt.show()
 #=======================================================================
@@ -153,7 +153,7 @@ def one_energy(arr,ix,iy,nmax):
     ixm = (ix-1)%nmax # of the neighbours
     iyp = (iy+1)%nmax # with wraparound
     iym = (iy-1)%nmax #
-    print(f"ix={ix},iy={iy},ixp={ixp},ixm={ixm},iyp={iyp},iym={iym}")
+    #print(f"ix={ix},iy={iy},ixp={ixp},ixm={ixm},iyp={iyp},iym={iym}")
     #print(f"type(ix)={type(ix)},type(iy)={type(iy)},type(ixp)={type(ixp)},type(ixm)={type(ixm)},type(iyp)={type(iyp)},type(iym)={type(iym)}")
     
 # Add together the 4 neighbour contributions
@@ -279,7 +279,7 @@ def MC_step(arr,Ts,nmax, rank, chunks, imax_for_rank):
         for j in range(nmax):
             ix = xran[i,j]
             iy = yran[i,j]
-            print(f"ix={ix},iy={iy}")
+            #print(f"ix={ix},iy={iy}")
             ang = aran[i,j]
             en0 = one_energy(arr,ix,iy,nmax)
             
