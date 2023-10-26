@@ -44,7 +44,7 @@ def initdat(nmax):
     arr = np.random.random_sample((nmax,nmax))*2.0*np.pi
     return arr
 #=======================================================================
-def plotdat(arr,pflag,nmax, final_plot= False):
+def plotdat(arr,pflag,nmax, temp, final_plot= False):
     """
     Arguments:
 	  arr (float(nmax,nmax)) = array that contains lattice data;
@@ -90,9 +90,9 @@ def plotdat(arr,pflag,nmax, final_plot= False):
     q = ax.quiver(x, y, u, v, cols,norm=norm, **quiveropts)
     ax.set_aspect('equal')
     if(final_plot == True):
-      plt.savefig(f"final_{nmax}.png")
+      plt.savefig(f"final_{nmax}_{temp}.png")
     else:
-      plt.savefig(f"initial_{nmax}.png")
+      plt.savefig(f"initial_{nmax}_{temp}.png")
         
     #plt.show()
 #=======================================================================
@@ -116,7 +116,7 @@ def savedat(arr,nsteps,Ts,runtime,ratio,energy,order,nmax):
     """
     # Create filename based on current date and time.
     current_datetime = datetime.datetime.now().strftime("%a-%d-%b-%Y-at-%I-%M-%S%p")
-    filename = "LL-Output-{:s}.txt".format(current_datetime)
+    filename = "LL-Output-{:s}-{}-{}.txt".format(current_datetime,nmax,Ts)
     FileOut = open(filename,"w")
     # Write a header with run parameters
     print("#=====================================================",file=FileOut)
@@ -337,7 +337,7 @@ def main(program, nsteps, nmax, temp, pflag):
 
     if(rank ==0):
       # Plot initial frame of lattice
-      plotdat(lattice,pflag,nmax)
+      plotdat(lattice,pflag,nmax,temp)
     # Create arrays to store energy, acceptance ratio and order parameter
     energy = np.zeros(nsteps+1,dtype=np.dtype)
     ratio = np.zeros(nsteps+1,dtype=np.dtype)
@@ -400,7 +400,7 @@ def main(program, nsteps, nmax, temp, pflag):
       print("{}: Size: {:d}, Steps: {:d}, T*: {:5.3f}: Order: {:5.3f}, Time: {:8.6f} s".format(program, nmax,nsteps,temp,order[nsteps-1],runtime))
       # Plot final frame of lattice and generate output file
       savedat(lattice,nsteps,temp,runtime,ratio,energy,order,nmax)
-      plotdat(lattice,pflag,nmax, final_plot=True)
+      plotdat(lattice,pflag,nmax,temp, final_plot=True)
 #=======================================================================
 # Main part of program, getting command line arguments and calling
 # main simulation function.
