@@ -5,3 +5,5 @@ May also look at get_order and all_energy.
 
 testing results from various speedups by comparing to main branch w/out speedups?
 
+copy tests into mpi4py branch and compare to values from mpi4py?
+
