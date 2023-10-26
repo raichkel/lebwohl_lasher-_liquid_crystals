@@ -21,6 +21,12 @@ domains alternate between old data and new data.
 
 SH 16-Oct-23
 """
+#=========================================
+# testing this code
+# use files in /tests folder
+# compare order parameter, energy, at each step
+# compare graphs? can we do this numerically? or do it by just visually comapring
+
 
 import sys
 import time
