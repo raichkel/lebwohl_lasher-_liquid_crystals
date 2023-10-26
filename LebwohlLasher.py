@@ -89,7 +89,7 @@ def plotdat(arr,pflag,nmax):
     fig, ax = plt.subplots()
     q = ax.quiver(x, y, u, v, cols,norm=norm, **quiveropts)
     ax.set_aspect('equal')
-    plt.show()
+    #plt.show()
 #=======================================================================
 def savedat(arr,nsteps,Ts,runtime,ratio,energy,order,nmax):
     """

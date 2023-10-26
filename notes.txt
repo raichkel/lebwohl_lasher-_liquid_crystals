@@ -1,3 +1,7 @@
 Looking at prof.txt:
 main and one_energy taking up the most time, followed by MC_step.
 May also look at get_order and all_energy.
+
+
+testing results from various speedups by comparing to main branch w/out speedups?
+
