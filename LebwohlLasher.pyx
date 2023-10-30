@@ -28,6 +28,7 @@ import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+import cython
 
 #=======================================================================
 def initdat(nmax):
@@ -41,6 +42,8 @@ def initdat(nmax):
 	Returns:
 	  arr (float(nmax,nmax)) = array to hold lattice.
     """
+    #cdef double arr[10]
+    #cdef double[:] array 
     arr = np.random.random_sample((nmax,nmax))*2.0*np.pi
     return arr
 #=======================================================================

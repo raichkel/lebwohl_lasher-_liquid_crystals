@@ -7,3 +7,4 @@ testing results from various speedups by comparing to main branch w/out speedups
 
 copy tests into mpi4py branch and compare to values from mpi4py?
 
+python run_LL.py 10 20 1.0 1
