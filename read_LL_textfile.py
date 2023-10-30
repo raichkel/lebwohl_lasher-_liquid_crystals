@@ -6,17 +6,35 @@ import numpy as np
 
 filename = "tests/10steps_20grid/LL-Output-Thu-26-Oct-2023-at-10-41-18AM.txt"
 
-data = pd.read_csv(filename, header = 7, delim_whitespace=True)
+def read_LL_file(filename):
+    '''
+    Reads LL.txt file as pandas df. 
+    Inputs:
+    - filename: str, path to .txt file
+    Returns:
+    - data: pandas DataFrame, LL simulation output data 
 
-# data written the same. real data will always be from line data.iloc[8] onwards
-# header is in line data.iloc[6]
+    Usage:
+    get certain value from column:
+    >> print(data.loc[:,'Order'].iloc[2])
+    '''
+    data = pd.read_csv(filename, header = 7, delim_whitespace=True)
+    # data written the same. real data will always be from line data.iloc[8] onwards
+    # header is in line data.iloc[6]
+    data = data.iloc[1:]
+    # remap columns and drop spares
+    dict = {'#':'MC_step', 'MC':'Ratio','step:':'Energy','Ratio:':'Order','Energy:':'0','Order:':'1'}
+    data.rename(mapper = dict,axis ='columns', inplace=True)
+    data.drop(['0','1'], axis =1, inplace=True)
+    data.set_index('MC_step', inplace=True)
 
-data = data.iloc[1:]
+    return data
 
-dict = {'#':'MC_step', 'MC':'Ratio','step:':'Energy','Ratio:':'Order','Energy:':'0','Order:':'1'}
-data.rename(mapper = dict,axis ='columns', inplace=True)
-data.drop(['0','1'], axis =1, inplace=True)
-data.set_index('MC_step', inplace=True)
 
-# get certain value from column
-#print(data.loc[:,'Order'].iloc[2])
+#====================================
+# testing data 
+# read in data from mpi4py case
+# read in data from normal test case
+# compare order, energy, ratio for each
+# repeat only for different gridsize at temp = 1.0
+# ensure that it is the same? presumably it should be 
