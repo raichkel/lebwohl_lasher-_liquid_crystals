@@ -30,6 +30,12 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import cython
 cimport numpy as cnp
+from libc.math cimport sin, cos, exp
+from cython.parallel import prange
+cimport openmp
+
+@cython.boundscheck(False)
+@cython.wraparound(False) 
 #=======================================================================
 #Variables cdefed according to generated LL.html file
 #=======================================================================
@@ -124,7 +130,7 @@ def savedat(cnp.ndarray[cnp.float64_t, ndim=2] arr,int nsteps,double Ts,double r
     """
     # Create filename based on current date and time.
     current_datetime = datetime.datetime.now().strftime("%a-%d-%b-%Y-at-%I-%M-%S%p")
-    filename = "LL-Output-{:s}.txt".format(current_datetime)
+    filename = "LL-Output-{:s}-{}-{}.txt".format(current_datetime,nmax,Ts)
     FileOut = open(filename,"w")
     # Write a header with run parameters
     print("#=====================================================",file=FileOut)
@@ -161,21 +167,22 @@ def one_energy(cnp.ndarray[cnp.float64_t, ndim=2] arr,Py_ssize_t ix,Py_ssize_t i
     cdef int ixm = (ix-1)%nmax # of the neighbours
     cdef int iyp = (iy+1)%nmax # with wraparound
     cdef int iym = (iy-1)%nmax #
-#
-# Add together the 4 neighbour contributions
-# to the energy
+
+  #
+  # Add together the 4 neighbour contributions
+  # to the energy
     cdef double ang 
     ang = arr[ix,iy]-arr[ixp,iy]
-    en += 0.5*(1.0 - 3.0*np.cos(ang)**2)
+    en += 0.5*(1.0 - 3.0*cos(ang)**2)
     ang = arr[ix,iy]-arr[ixm,iy]
-    en += 0.5*(1.0 - 3.0*np.cos(ang)**2)
+    en += 0.5*(1.0 - 3.0*cos(ang)**2)
     ang = arr[ix,iy]-arr[ix,iyp]
-    en += 0.5*(1.0 - 3.0*np.cos(ang)**2)
+    en += 0.5*(1.0 - 3.0*cos(ang)**2)
     ang = arr[ix,iy]-arr[ix,iym]
-    en += 0.5*(1.0 - 3.0*np.cos(ang)**2)
+    en += 0.5*(1.0 - 3.0*cos(ang)**2)
     return en
 #=======================================================================
-def all_energy(cnp.ndarray[cnp.float64_t, ndim=2] arr,int nmax):
+def all_energy(cnp.ndarray[cnp.float64_t, ndim=2] arr,int nmax, int threads):
     """
     Arguments:
 	  arr (float(nmax,nmax)) = array that contains lattice data;
@@ -188,10 +195,35 @@ def all_energy(cnp.ndarray[cnp.float64_t, ndim=2] arr,int nmax):
     """
     cdef double enall = 0.0
     cdef Py_ssize_t i, j
+    cdef double en
+    cdef int ixp
+    cdef int ixm
+    cdef int iyp
+    cdef int iym
+    cdef double ang 
 
-    for i in range(nmax):
+    cdef double [:,::1] lattice_arr = arr
+   
+    for i in prange(nmax, nogil=True, num_threads=threads):
         for j in range(nmax):
-            enall += one_energy(arr,i,j,nmax)
+          en= 0.0
+          ixp = (i+1)%nmax # These are the coordinates
+          ixm = (i-1)%nmax # of the neighbours
+          iyp = (j+1)%nmax # with wraparound
+          iym = (j-1)%nmax #
+
+          #
+          # Add together the 4 neighbour contributions
+          # to the energy
+          ang = lattice_arr[i][j]-lattice_arr[ixp][j]
+          en += 0.5*(1.0 - 3.0*cos(ang)**2)
+          ang = lattice_arr[i][j]-lattice_arr[ixm][j]
+          en += 0.5*(1.0 - 3.0*cos(ang)**2)
+          ang = lattice_arr[i][j]-lattice_arr[i][iyp]
+          en += 0.5*(1.0 - 3.0*cos(ang)**2)
+          ang = lattice_arr[i][j]-lattice_arr[i][iym]
+          en += 0.5*(1.0 - 3.0*cos(ang)**2)
+          enall += en
     return enall
 #=======================================================================
 def get_order(cnp.ndarray[cnp.float64_t, ndim=2] arr,int nmax):
@@ -215,11 +247,13 @@ def get_order(cnp.ndarray[cnp.float64_t, ndim=2] arr,int nmax):
     # Generate a 3D unit vector for each cell (i,j) and
     # put it in a (3,i,j) array.
     #
-    cdef cnp.ndarray[cnp.float64_t, ndim=3] lab = np.vstack((np.cos(arr),np.sin(arr),np.zeros_like(arr))).reshape(3,nmax,nmax)
+    cdef cnp.ndarray[cnp.float64_t, ndim=3] lab
+    lab = np.vstack((np.cos(arr),np.sin(arr),np.zeros_like(arr))).reshape(3,nmax,nmax)
     cdef Py_ssize_t a,b,i,j
 
     for a in range(3):
         for b in range(3):
+          # possibly openmp this - not calling any functions, could make these arrays typed memoryviews?
             for i in range(nmax):
                 for j in range(nmax):
                     Qab[a,b] += 3*lab[a,i,j]*lab[b,i,j] - delta[a,b]
@@ -262,7 +296,8 @@ def MC_step(cnp.ndarray[cnp.float64_t, ndim=2] arr,double Ts,int nmax):
     cdef double en0
     cdef double en1 
     cdef double boltz 
-
+    # openmp this - definitely accessing python objects eg. functions, but exp is cdefed
+    # calling np.random.uniform - may not work....
     for i in range(nmax):
         for j in range(nmax):
             ix = xran[i,j]
@@ -276,7 +311,7 @@ def MC_step(cnp.ndarray[cnp.float64_t, ndim=2] arr,double Ts,int nmax):
             else:
             # Now apply the Monte Carlo test - compare
             # exp( -(E_new - E_old) / T* ) >= rand(0,1)
-                boltz = np.exp( -(en1 - en0) / Ts )
+                boltz = exp( -(en1 - en0) / Ts )
 
                 if boltz >= np.random.uniform(0.0,1.0):
                     accept += 1
@@ -284,7 +319,7 @@ def MC_step(cnp.ndarray[cnp.float64_t, ndim=2] arr,double Ts,int nmax):
                     arr[ix,iy] -= ang
     return accept/(nmax*nmax)
 #=======================================================================
-def main(program,int nsteps,int nmax,double temp,int pflag):
+def main(program,int nsteps,int nmax,double temp,int pflag, int threads):
     """
     Arguments:
 	  program (string) = the name of the program;
@@ -306,18 +341,21 @@ def main(program,int nsteps,int nmax,double temp,int pflag):
     cdef cnp.ndarray[cnp.float64_t, ndim=1] ratio = np.zeros(nsteps+1)
     cdef cnp.ndarray[cnp.float64_t, ndim=1] order = np.zeros(nsteps+1,)
     # Set initial values in arrays
-    energy[0] = all_energy(lattice,nmax)
+    energy[0] = all_energy(lattice,nmax,threads)
     ratio[0] = 0.5 # ideal value
     order[0] = get_order(lattice,nmax)
 
     # Begin doing and timing some MC steps.
-    initial = time.time()
+    initial = openmp.omp_get_wtime()
+    #initial = time.time()
     cdef Py_ssize_t it
     for it in range(1,nsteps+1):
         ratio[it] = MC_step(lattice,temp,nmax)
-        energy[it] = all_energy(lattice,nmax)
+        energy[it] = all_energy(lattice,nmax,threads)
         order[it] = get_order(lattice,nmax)
-    final = time.time()
+
+   # final = time.time()
+    final = openmp.omp_get_wtime()
     runtime = final-initial
     
     # Final outputs
@@ -330,13 +368,14 @@ def main(program,int nsteps,int nmax,double temp,int pflag):
 # main simulation function.
 #
 if __name__ == '__main__':
-    if int(len(sys.argv)) == 5:
+    if int(len(sys.argv)) == 6:
         PROGNAME = sys.argv[0]
         ITERATIONS = int(sys.argv[1])
         SIZE = int(sys.argv[2])
         TEMPERATURE = float(sys.argv[3])
         PLOTFLAG = int(sys.argv[4])
-        main(PROGNAME, ITERATIONS, SIZE, TEMPERATURE, PLOTFLAG)
+        THREADS = int(sys.argv[5])
+        main(PROGNAME, ITERATIONS, SIZE, TEMPERATURE, PLOTFLAG, THREADS)
     else:
-        print("Usage: python {} <ITERATIONS> <SIZE> <TEMPERATURE> <PLOTFLAG>".format(sys.argv[0]))
+        print("Usage: python {} <ITERATIONS> <SIZE> <TEMPERATURE> <PLOTFLAG> <THREADS>".format(sys.argv[0]))
 #=======================================================================
