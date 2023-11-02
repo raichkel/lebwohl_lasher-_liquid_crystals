@@ -44,7 +44,7 @@ def initdat(nmax):
     arr = np.random.random_sample((nmax,nmax))*2.0*np.pi
     return arr
 #=======================================================================
-def plotdat(arr,pflag,nmax, final_plot=False):
+def plotdat(arr,pflag,nmax,Ts, final_plot=False):
     """
     Arguments:
 	  arr (float(nmax,nmax)) = array that contains lattice data;
@@ -73,8 +73,8 @@ def plotdat(arr,pflag,nmax, final_plot=False):
     if pflag==1: # colour the arrows according to energy
         mpl.rc('image', cmap='rainbow')
         for i in range(nmax):
-            for j in range(nmax):
-                cols[i,j] = one_energy(arr,i,j,nmax)
+          
+          cols[i,:] = vector_one_energy(arr,i,nmax)
         norm = plt.Normalize(cols.min(), cols.max())
     elif pflag==2: # colour the arrows according to angle
         mpl.rc('image', cmap='hsv')
@@ -91,9 +91,9 @@ def plotdat(arr,pflag,nmax, final_plot=False):
     ax.set_aspect('equal')
 
     if(final_plot == True):
-      plt.savefig(f"final_{nmax}.png")
+      plt.savefig(f"final_{nmax}_{Ts}.png")
     else:
-      plt.savefig(f"initial_{nmax}.png")
+      plt.savefig(f"initial_{nmax}_{Ts}.png")
     #plt.show()
 #=======================================================================
 def savedat(arr,nsteps,Ts,runtime,ratio,energy,order,nmax):
@@ -116,7 +116,7 @@ def savedat(arr,nsteps,Ts,runtime,ratio,energy,order,nmax):
     """
     # Create filename based on current date and time.
     current_datetime = datetime.datetime.now().strftime("%a-%d-%b-%Y-at-%I-%M-%S%p")
-    filename = "LL-Output-{:s}.txt".format(current_datetime)
+    filename = "LL-Output-{:s}-{}-{}.txt".format(current_datetime,nmax,Ts)
     FileOut = open(filename,"w")
     # Write a header with run parameters
     print("#=====================================================",file=FileOut)
@@ -167,6 +167,39 @@ def one_energy(arr,ix,iy,nmax):
     en += 0.5*(1.0 - 3.0*np.cos(ang)**2)
     return en
 #=======================================================================
+def vector_one_energy(arr,ix,nmax):
+  """
+  Arguments:
+  arr (float(nmax,nmax)) = array that contains lattice data;
+  ix (int) = x lattice coordinate of row;
+  nmax (int) = side length of square lattice.
+  Description:
+    Function that computes the energy of a row of the
+    lattice taking into account periodic boundaries.  Working with
+    reduced energy (U/epsilon), equivalent to setting epsilon=1 in
+    equation (1) in the project notes.
+	Returns:
+	  en (float) = reduced energy of cell.
+    """
+  en = 0.0
+
+  # Add together the 4 neighbour contributions
+  # to the energy
+
+  rolled_up = np.roll(arr,1, axis=0) # compare normal i with rolled_up i, equivalent of arr[ix,iy]-arr[ixp,iy]
+  rolled_down = np.roll(arr,-1,axis=0) # compare normal i with rolled_down i, equivalent of arr[ix,iy]-arr[ixm,iy]
+  rolled_left = np.roll(arr,-1,axis=1) # compare normal i with rolled_left i, equivalent of arr[ix,iy]-arr[ix,iyp]
+  rolled_right = np.roll(arr,-1,axis=1) # compare normal i with rolled_left i, equivalent of arr[ix,iy]-arr[ix,iym]
+  ang = arr[ix,:]-rolled_up[ix,:]
+  en += 0.5*(1.0 - 3.0*np.cos(ang)**2)
+  ang = arr[ix,:]-rolled_down[ix,:]
+  en += 0.5*(1.0 - 3.0*np.cos(ang)**2)
+  ang = arr[ix,:]-rolled_left[ix,:]
+  en += 0.5*(1.0 - 3.0*np.cos(ang)**2)
+  ang = arr[ix,:]-rolled_right[ix,:]
+  en += 0.5*(1.0 - 3.0*np.cos(ang)**2)
+  return en
+#==========================================================================
 def all_energy(arr,nmax):
     """
     Arguments:
@@ -180,8 +213,10 @@ def all_energy(arr,nmax):
     """
     enall = 0.0
     for i in range(nmax):
-        for j in range(nmax):
-            enall += one_energy(arr,i,j,nmax)
+
+      line = vector_one_energy(arr,i,nmax)
+      enall += np.sum(line)
+
     return enall
 #=======================================================================
 def get_order(arr,nmax):
@@ -206,8 +241,8 @@ def get_order(arr,nmax):
     for a in range(3):
         for b in range(3):
             for i in range(nmax):
-                for j in range(nmax):
-                    Qab[a,b] += 3*lab[a,i,j]*lab[b,i,j] - delta[a,b]
+              row_arr = 3*lab[a,i,:]*lab[b,i,:] - delta[a,b]
+              Qab[a,b] += np.sum(row_arr)
     Qab = Qab/(2*nmax*nmax)
     eigenvalues,eigenvectors = np.linalg.eig(Qab)
     return eigenvalues.max()
@@ -238,25 +273,28 @@ def MC_step(arr,Ts,nmax):
     xran = np.random.randint(0,high=nmax, size=(nmax,nmax))
     yran = np.random.randint(0,high=nmax, size=(nmax,nmax))
     aran = np.random.normal(scale=scale, size=(nmax,nmax))
+    
     for i in range(nmax):
-        for j in range(nmax):
-            ix = xran[i,j]
-            iy = yran[i,j]
-            ang = aran[i,j]
-            en0 = one_energy(arr,ix,iy,nmax)
-            arr[ix,iy] += ang
-            en1 = one_energy(arr,ix,iy,nmax)
-            if en1<=en0:
+      for j in range(nmax):
+        ix = xran[i,j]
+        iy = yran[i,j]
+        ang = aran[i,j]
+          
+
+        en0 = one_energy(arr,ix,iy,nmax)
+        arr[ix,iy] += ang
+        en1 = one_energy(arr,ix,iy,nmax)
+        if en1<=en0:
+            accept += 1
+        else:
+        # Now apply the Monte Carlo test - compare
+        # exp( -(E_new - E_old) / T* ) >= rand(0,1)
+            boltz = np.exp( -(en1 - en0) / Ts )
+
+            if boltz >= np.random.uniform(0.0,1.0):
                 accept += 1
             else:
-            # Now apply the Monte Carlo test - compare
-            # exp( -(E_new - E_old) / T* ) >= rand(0,1)
-                boltz = np.exp( -(en1 - en0) / Ts )
-
-                if boltz >= np.random.uniform(0.0,1.0):
-                    accept += 1
-                else:
-                    arr[ix,iy] -= ang
+                arr[ix,iy] -= ang
     return accept/(nmax*nmax)
 #=======================================================================
 def main(program, nsteps, nmax, temp, pflag):
@@ -272,10 +310,11 @@ def main(program, nsteps, nmax, temp, pflag):
     Returns:
       NULL
     """
+  
     # Create and initialise lattice
     lattice = initdat(nmax)
     # Plot initial frame of lattice
-    plotdat(lattice,pflag,nmax)
+    plotdat(lattice,pflag,nmax,temp)
     # Create arrays to store energy, acceptance ratio and order parameter
     energy = np.zeros(nsteps+1,dtype=np.dtype)
     ratio = np.zeros(nsteps+1,dtype=np.dtype)
@@ -298,7 +337,7 @@ def main(program, nsteps, nmax, temp, pflag):
     print("{}: Size: {:d}, Steps: {:d}, T*: {:5.3f}: Order: {:5.3f}, Time: {:8.6f} s".format(program, nmax,nsteps,temp,order[nsteps-1],runtime))
     # Plot final frame of lattice and generate output file
     savedat(lattice,nsteps,temp,runtime,ratio,energy,order,nmax)
-    plotdat(lattice,pflag,nmax, final_plot=True)
+    plotdat(lattice,pflag,nmax,temp,final_plot=True)
 #=======================================================================
 # Main part of program, getting command line arguments and calling
 # main simulation function.
