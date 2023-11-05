@@ -31,7 +31,7 @@ import matplotlib as mpl
 from numba import jit 
 
 #=======================================================================
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def initdat(nmax):
     """
     Arguments:
@@ -46,7 +46,7 @@ def initdat(nmax):
     arr = np.random.random_sample((nmax,nmax))*2.0*np.pi
     return arr
 #=======================================================================
-def plotdat(arr,pflag,nmax, final_plot=False):
+def plotdat(arr,pflag,nmax,Ts, final_plot=False):
     """
     Arguments:
 	  arr (float(nmax,nmax)) = array that contains lattice data;
@@ -93,9 +93,9 @@ def plotdat(arr,pflag,nmax, final_plot=False):
     ax.set_aspect('equal')
 
     if(final_plot == True):
-      plt.savefig(f"final_{nmax}.png")
+      plt.savefig(f"numba_results/{nmax}_grid/T_{Ts}/final_{nmax}.png")
     else:
-      plt.savefig(f"initial_{nmax}.png")
+      plt.savefig(f"numba_results/{nmax}_grid/T_{Ts}/initial_{nmax}.png")
     #plt.show()
 #=======================================================================
 def savedat(arr,nsteps,Ts,runtime,ratio,energy,order,nmax):
@@ -118,7 +118,7 @@ def savedat(arr,nsteps,Ts,runtime,ratio,energy,order,nmax):
     """
     # Create filename based on current date and time.
     current_datetime = datetime.datetime.now().strftime("%a-%d-%b-%Y-at-%I-%M-%S%p")
-    filename = "LL-Output-{:s}.txt".format(current_datetime)
+    filename = f"numba_results/{nmax}_grid/T_{Ts}/LL-Output-{current_datetime:s}-{nmax}-{Ts}.txt"
     FileOut = open(filename,"w")
     # Write a header with run parameters
     print("#=====================================================",file=FileOut)
@@ -135,7 +135,7 @@ def savedat(arr,nsteps,Ts,runtime,ratio,energy,order,nmax):
         print("   {:05d}    {:6.4f} {:12.4f}  {:6.4f} ".format(i,ratio[i],energy[i],order[i]),file=FileOut)
     FileOut.close()
 #=======================================================================
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def one_energy(arr,ix,iy,nmax):
     """
     Arguments:
@@ -170,7 +170,7 @@ def one_energy(arr,ix,iy,nmax):
     en += 0.5*(1.0 - 3.0*np.cos(ang)**2)
     return en
 #=======================================================================
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def all_energy(arr,nmax):
     """
     Arguments:
@@ -188,7 +188,7 @@ def all_energy(arr,nmax):
             enall += one_energy(arr,i,j,nmax)
     return enall
 #=======================================================================
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def get_order(arr,nmax):
     """
     Arguments:
@@ -217,7 +217,7 @@ def get_order(arr,nmax):
     eigenvalues,eigenvectors = np.linalg.eig(Qab)
     return eigenvalues.max()
 #=======================================================================
-@jit(nopython=True)
+#@jit(nopython=True, cache=True)
 def MC_step(arr,Ts,nmax):
     """
     Arguments:
@@ -282,7 +282,7 @@ def main(program, nsteps, nmax, temp, pflag):
     # Create and initialise lattice
     lattice = initdat(nmax)
     # Plot initial frame of lattice
-    plotdat(lattice,pflag,nmax)
+    plotdat(lattice,pflag,nmax,temp)
     # Create arrays to store energy, acceptance ratio and order parameter
     energy = np.zeros(nsteps+1,dtype=np.dtype)
     ratio = np.zeros(nsteps+1,dtype=np.dtype)
@@ -305,7 +305,7 @@ def main(program, nsteps, nmax, temp, pflag):
     print("{}: Size: {:d}, Steps: {:d}, T*: {:5.3f}: Order: {:5.3f}, Time: {:8.6f} s".format(program, nmax,nsteps,temp,order[nsteps-1],runtime))
     # Plot final frame of lattice and generate output file
     savedat(lattice,nsteps,temp,runtime,ratio,energy,order,nmax)
-    plotdat(lattice,pflag,nmax, final_plot=True)
+    plotdat(lattice,pflag,nmax,temp, final_plot=True)
 #=======================================================================
 # Main part of program, getting command line arguments and calling
 # main simulation function.
