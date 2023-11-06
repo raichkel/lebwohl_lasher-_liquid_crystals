@@ -55,7 +55,7 @@ def initdat(int nmax):
   arr = np.random.random_sample((nmax,nmax))*2.0*np.pi
   return arr
 #=======================================================================
-def plotdat(cnp.ndarray[cnp.float64_t, ndim=2] arr,int pflag,int nmax, bint final_plot=False):
+def plotdat(cnp.ndarray[cnp.float64_t, ndim=2] arr,int pflag,int nmax, float temp, bint final_plot=False):
     """
     Arguments:
 	  arr (float(nmax,nmax)) = array that contains lattice data;
@@ -105,9 +105,9 @@ def plotdat(cnp.ndarray[cnp.float64_t, ndim=2] arr,int pflag,int nmax, bint fina
     ax.set_aspect('equal')
 
     if(final_plot == True):
-      plt.savefig(f"final_{nmax}.png")
+      plt.savefig("cython_results/{}_grid/T_{:.1f}/final_{}_{:.1f}.png".format(nmax,temp,nmax,temp))
     else:
-      plt.savefig(f"initial_{nmax}.png")
+      plt.savefig("cython_results/{}_grid/T_{:.1f}/final_{}_{:.1f}.png".format(nmax,temp,nmax,temp))
     #plt.show()
 #=======================================================================
 def savedat(cnp.ndarray[cnp.float64_t, ndim=2] arr,int nsteps,double Ts,double runtime,cnp.ndarray[cnp.float64_t, ndim=1] ratio,cnp.ndarray[cnp.float64_t, ndim=1] energy,cnp.ndarray[cnp.float64_t, ndim=1] order,int nmax):
@@ -130,7 +130,7 @@ def savedat(cnp.ndarray[cnp.float64_t, ndim=2] arr,int nsteps,double Ts,double r
     """
     # Create filename based on current date and time.
     current_datetime = datetime.datetime.now().strftime("%a-%d-%b-%Y-at-%I-%M-%S%p")
-    filename = "LL-Output-{:s}-{}-{}.txt".format(current_datetime,nmax,Ts)
+    filename = "cython_results/{}_grid/T_{:.1f}/LL-Output-{:s}-{}-{:.1f}.txt".format(nmax,Ts,current_datetime,nmax,Ts)
     FileOut = open(filename,"w")
     # Write a header with run parameters
     print("#=====================================================",file=FileOut)
@@ -335,7 +335,7 @@ def main(program,int nsteps,int nmax,double temp,int pflag, int threads):
     # Create and initialise lattice
     cdef cnp.ndarray[cnp.float64_t, ndim=2] lattice = initdat(nmax)
     # Plot initial frame of lattice
-    plotdat(lattice,pflag,nmax)
+    plotdat(lattice,pflag,nmax,temp)
     # Create arrays to store energy, acceptance ratio and order parameter
     cdef cnp.ndarray[cnp.float64_t, ndim=1] energy = np.zeros(nsteps+1)
     cdef cnp.ndarray[cnp.float64_t, ndim=1] ratio = np.zeros(nsteps+1)
@@ -362,7 +362,7 @@ def main(program,int nsteps,int nmax,double temp,int pflag, int threads):
     print("{}: Size: {:d}, Steps: {:d}, T*: {:5.3f}: Order: {:5.3f}, Time: {:8.6f} s".format(program, nmax,nsteps,temp,order[nsteps-1],runtime))
     # Plot final frame of lattice and generate output file
     savedat(lattice,nsteps,temp,runtime,ratio,energy,order,nmax)
-    plotdat(lattice,pflag,nmax, final_plot=True)
+    plotdat(lattice,pflag,nmax,temp, final_plot=True)
 #=======================================================================
 # Main part of program, getting command line arguments and calling
 # main simulation function.

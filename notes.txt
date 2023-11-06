@@ -8,6 +8,7 @@ testing results from various speedups by comparing to main branch w/out speedups
 copy tests into mpi4py branch and compare to values from mpi4py?
 
 python run_LL.py 10 20 1.0 1 4
+python run_LL.py 1000 20 0.2 1 4
 
 cdef cnp.ndarray[cnp.int_t, ndim=2] data
 data = np.empty((N, N), dtype=int)
