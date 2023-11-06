@@ -1,3 +1,18 @@
 Looking at prof.txt:
 main and one_energy taking up the most time, followed by MC_step.
 May also look at get_order and all_energy.
+
+
+testing results from various speedups by comparing to main branch w/out speedups?
+
+copy tests into mpi4py branch and compare to values from mpi4py?
+
+"given system size, we are interested in observing the value of liquid crystal order parameter, S, as a function
+of reduced temperature, T*"
+- recreate plots
+
+"independent simulations at each temperature, being careful to ensure the system has equilibrated i.e. both the energy and
+order parameter should have reached plateaux"
+- check for plateau in values
+
+"Average quantities should be determined from the equilibrated parts of the simulations."

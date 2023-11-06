@@ -30,11 +30,3 @@ def read_LL_file(filename):
 
     return data
 
-
-#====================================
-# testing data 
-# read in data from mpi4py case
-# read in data from normal test case
-# compare order, energy, ratio for each
-# repeat only for different gridsize at temp = 1.0
-# ensure that it is the same? presumably it should be 
