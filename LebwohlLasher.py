@@ -96,9 +96,9 @@ def plotdat(arr,pflag,nmax, temp, final_plot= False):
     q = ax.quiver(x, y, u, v, cols,norm=norm, **quiveropts)
     ax.set_aspect('equal')
     if(final_plot == True):
-      plt.savefig(f"final_{nmax}_{temp}.png")
+      plt.savefig(f"mpi_results/10nodes_10steps_{nmax}grid/T_{temp}/final_{nmax}_{temp}.png")
     else:
-      plt.savefig(f"initial_{nmax}_{temp}.png")
+      plt.savefig(f"mpi_results/10nodes_10steps_{nmax}grid/T_{temp}/initial_{nmax}_{temp}.png")
         
     #plt.show()
 #=======================================================================
@@ -122,7 +122,7 @@ def savedat(arr,nsteps,Ts,runtime,ratio,energy,order,nmax):
     """
     # Create filename based on current date and time.
     current_datetime = datetime.datetime.now().strftime("%a-%d-%b-%Y-at-%I-%M-%S%p")
-    filename = "LL-Output-{:s}-{}-{}.txt".format(current_datetime,nmax,Ts)
+    filename = f"mpi_results/10nodes_10steps_{nmax}grid/T_{Ts}/LL-Output-{current_datetime:s}-{nmax}-{Ts}.txt"
     FileOut = open(filename,"w")
     # Write a header with run parameters
     print("#=====================================================",file=FileOut)
