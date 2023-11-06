@@ -91,9 +91,9 @@ def plotdat(arr,pflag,nmax,Ts, final_plot=False):
     ax.set_aspect('equal')
 
     if(final_plot == True):
-      plt.savefig(f"final_{nmax}_{Ts}.png")
+      plt.savefig(f"np_results/{nmax}_grid/T_{Ts}/final_{nmax}_{Ts}.png")
     else:
-      plt.savefig(f"initial_{nmax}_{Ts}.png")
+      plt.savefig(f"np_results/{nmax}_grid/T_{Ts}/final_{nmax}_{Ts}.png")
     #plt.show()
 #=======================================================================
 def savedat(arr,nsteps,Ts,runtime,ratio,energy,order,nmax):
@@ -116,7 +116,7 @@ def savedat(arr,nsteps,Ts,runtime,ratio,energy,order,nmax):
     """
     # Create filename based on current date and time.
     current_datetime = datetime.datetime.now().strftime("%a-%d-%b-%Y-at-%I-%M-%S%p")
-    filename = "LL-Output-{:s}-{}-{}.txt".format(current_datetime,nmax,Ts)
+    filename = f"np_results/{nmax}_grid/T_{Ts}/LL-Output-{current_datetime:s}-{nmax}-{Ts}.txt"
     FileOut = open(filename,"w")
     # Write a header with run parameters
     print("#=====================================================",file=FileOut)
