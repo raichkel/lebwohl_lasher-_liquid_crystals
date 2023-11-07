@@ -42,6 +42,7 @@ for nfolder in os.listdir(folder):
     time_arr_gridsize[x] = np.mean(time_arr)
     x+=1
 
+np.savetxt("np.csv", time_arr_gridsize, delimiter=",")
 fig, ax = plt.subplots(1,1)
 ax.plot(gridsize,time_arr_gridsize, color = "orange")
 ax.scatter(gridsize,time_arr_gridsize, color = "purple")
